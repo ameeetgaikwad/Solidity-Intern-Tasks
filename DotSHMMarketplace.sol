@@ -3,9 +3,8 @@ pragma solidity ^0.8.18;
 
 import "./IMinterController.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
-contract DotShmMarketplace {
+contract DotSHMMarketplace {
     IMinterController private _minterController;
     address private _owner;
     uint256 private _salePrice;
@@ -68,13 +67,13 @@ contract DotShmMarketplace {
 
         // Pay the referral bonus
         if (referralBonus > 0) {
-            (bool success, ) = payable(referrer).call{value: referralBonus}("");
-            require(success, "eth transfer failed");
+            (bool s, ) = payable(referrer).call{value: referralBonus}("");
+            require(s, "eth transfer failed");
         }
 
         // Pay the seller
         (bool success, ) = payable(_owner).call{value: payment}("");
-        require(success, "eth tranfer failed");
+        require(success, "eth transfer failed");
         registerDomainHolder(msg.sender);
         emit DomainPurchased(msg.sender, label, _salePrice);
     }
@@ -84,29 +83,24 @@ contract DotShmMarketplace {
     ) external payable {
         require(msg.value >= _salePrice, "Insufficient funds");
 
-        // Calculate the referral bonus
-
-        uint256 referralPercentage = _referralPercentages[referrer];
-        if (referralPercentage == 0) {
-            referralPercentage = 10;
-        }
-        uint256 referralBonus = (msg.value * referralPercentage) / 100;
-        uint256 payment = msg.value - referralBonus;
-
         // Mint the domain token
         _minterController.mintURI(msg.sender, label);
 
-        // Pay the referral bonus
-        if (referralBonus > 0) {
-            (bool success, ) = payable(referrer).call{value: referralBonus}("");
-            require(success, "eth transfer failed");
-        }
-
         // Pay the seller
-        (bool success, ) = payable(_owner).call{value: payment}("");
-        require(success, "eth tranfer failed");
+        (bool success, ) = payable(_owner).call{value: msg.value}("");
+        require(success, "eth transfer failed");
         registerDomainHolder(msg.sender);
         emit DomainPurchased(msg.sender, label, _salePrice);
+    }
+
+    function getDomainForOwner(
+        address account,
+        string calldata label
+    ) external onlyOwner {
+        // account: address for which the domain should be assigned free of cost
+        _minterController.mintURI(account, label);
+        registerDomainHolder(account);
+        emit DomainPurchased(account, label, 0);
     }
 
     function withdraw() external onlyOwner {
@@ -125,9 +119,6 @@ contract DotShmMarketplace {
         uint256 balance = IERC20(tokenAddress).balanceOf(address(this));
         require(balance > 0, "No balance to withdraw");
 
-        require(
-            IERC20(tokenAddress).transfer(_owner, balance),
-            "Transfer failed"
-        );
+        IERC20(tokenAddress).transfer(_owner, balance);
     }
 }
